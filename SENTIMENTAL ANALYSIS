@@ -1,0 +1,36 @@
+import pandas as pd
+from sklearn.model_selection import train_test_split
+from sklearn.feature_extraction.text import CountVectorizer
+from sklearn.naive_bayes import MultinomialNB
+import joblib
+existing_data = pd.read_csv('existing_social_media_data.csv')
+model = joblib.load('sentiment_analysis_model.pkl')
+vectorizer = joblib.load('vectorizer.pkl')
+new_data = pd.read_csv('new_social_media_data.csv')
+combined_data = pd.concat([existing_data, new_data], ignore_index=True)
+combined_data['text'] = combined_data['text'].str.replace('[^a-zA-Z\s]', '').str.lower()
+X = vectorizer.transform(combined_data['text'])
+y = combined_data['sentiment']
+X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+model.fit(X_train, y_train)
+joblib.dump(model, 'sentiment_analysis_model.pkl')
+joblib.dump(vectorizer, 'vectorizer.pkl')
+from flask import Flask, request, jsonify
+import joblib
+app = Flask(__name__)
+model = joblib.load('sentiment_analysis_model.pkl')
+vectorizer = joblib.load('vectorizer.pkl')
+@app.route('/predict', methods=['POST'])
+def predict_sentiment():
+    data = request.get_json()
+    text = data['text']
+    # Preprocess the text
+    text = text.replace('[^a-zA-Z\s]', '').lower()
+    # Vectorize the text
+    text_vectorized = vectorizer.transform([text])
+    # Predict sentiment
+    sentiment = model.predict(text_vectorized)[0]
+    return jsonify({'sentiment': sentiment})
+if __name__ == '__main__':
+    app.run(debug=True)
+
